@@ -466,8 +466,12 @@ public class UDFUtil {
                 .map(URLUtil::getURL)
                 .collect(Collectors.toList()));
 
-        FileUtil.writeUtf8String(
+        File file =  FileUtil.writeUtf8String(
                 JsonUtils.toJsonString(flinkUdfManifest),
                 PathConstant.getUdfPackagePath(taskId) + PathConstant.DEP_MANIFEST);
+
+        // 设置所有人可读可写
+        file.setReadable(true, false);
+        file.setWritable(true, false);
     }
 }
