@@ -19,42 +19,35 @@
 
 package org.dinky.service.impl;
 
+import cn.dev33.satoken.secure.SaSecureUtil;
+import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dinky.assertion.Asserts;
 import org.dinky.context.RowLevelPermissionsContext;
 import org.dinky.context.TenantContextHolder;
 import org.dinky.context.UserInfoContextHolder;
-import org.dinky.data.dto.AssignRoleDTO;
-import org.dinky.data.dto.AssignUserToTenantDTO;
-import org.dinky.data.dto.LoginDTO;
-import org.dinky.data.dto.ModifyPasswordDTO;
-import org.dinky.data.dto.UserDTO;
+import org.dinky.data.dto.*;
 import org.dinky.data.enums.Status;
 import org.dinky.data.enums.UserType;
 import org.dinky.data.exception.AuthException;
 import org.dinky.data.exception.BusException;
 import org.dinky.data.model.SysToken;
 import org.dinky.data.model.SystemConfiguration;
-import org.dinky.data.model.rbac.Menu;
-import org.dinky.data.model.rbac.Role;
-import org.dinky.data.model.rbac.RoleMenu;
-import org.dinky.data.model.rbac.RowPermissions;
-import org.dinky.data.model.rbac.Tenant;
-import org.dinky.data.model.rbac.User;
-import org.dinky.data.model.rbac.UserRole;
-import org.dinky.data.model.rbac.UserTenant;
+import org.dinky.data.model.rbac.*;
 import org.dinky.data.result.Result;
 import org.dinky.data.vo.UserVo;
 import org.dinky.mapper.TokenMapper;
 import org.dinky.mapper.UserMapper;
 import org.dinky.mybatis.service.impl.SuperServiceImpl;
-import org.dinky.service.MenuService;
-import org.dinky.service.RoleMenuService;
-import org.dinky.service.RoleService;
-import org.dinky.service.RowPermissionsService;
-import org.dinky.service.TenantService;
-import org.dinky.service.UserRoleService;
-import org.dinky.service.UserService;
-import org.dinky.service.UserTenantService;
+import org.dinky.service.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -62,20 +55,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-
-import cn.dev33.satoken.secure.SaSecureUtil;
-import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.StrUtil;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * UserServiceImpl
@@ -185,6 +164,11 @@ public class UserServiceImpl extends SuperServiceImpl<UserMapper, User> implemen
             return Result.authorizeFailed(e.getStatus());
         }
 
+        return loginUser(user, loginDTO.isAutoLogin());
+    }
+
+    @Override
+    public Result<UserDTO> loginUser(User user, boolean autoLogin) {
         // Check if the user is enabled
         if (!user.getEnabled()) {
             loginLogService.saveLoginLog(user, Status.USER_DISABLED_BY_ADMIN);
@@ -199,7 +183,7 @@ public class UserServiceImpl extends SuperServiceImpl<UserMapper, User> implemen
 
         // Perform login using StpUtil (Assuming it handles the session management)
         Integer userId = user.getId();
-        StpUtil.login(userId, loginDTO.isAutoLogin());
+        StpUtil.login(userId, autoLogin);
 
         // save login log record
         loginLogService.saveLoginLog(user, Status.LOGIN_SUCCESS);
@@ -323,6 +307,14 @@ public class UserServiceImpl extends SuperServiceImpl<UserMapper, User> implemen
     public User getUserByUsername(String username) {
         return getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
     }
+//
+//    @Override
+//    public User getUserByUsernameOrId(String username) {
+//        return getOne(
+//                StringUtils.isNumeric(username) ? new LambdaQueryWrapper<User>().eq(User::getUsername, username) :
+//                        new LambdaQueryWrapper<User>().eq(User::getUsername, username)
+//                                .or().eq(User::getId, username).orderByAsc(User::getUsername));
+//    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

@@ -64,3 +64,5 @@ extends/*
 /.run/
 
 .idea
+
+**/.flattened-pom.xml
