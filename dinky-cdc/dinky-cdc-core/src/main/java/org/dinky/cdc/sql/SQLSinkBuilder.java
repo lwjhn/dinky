@@ -78,9 +78,16 @@ public class SQLSinkBuilder extends AbstractSqlSinkBuilder implements Serializab
 
     private List<Operation> addSinkInsert(
             Table table, String viewName, String tableName, String sinkSchemaName, String sinkTableName) {
+        String flinkDDL; boolean isTemporary = customTableEnvironment.getConfig().get(CREATE_TEMPORARY_TABLE);
+        if(customTableEnvironment.getConfig().get(DROP_TABLE_IF_EXISTS)){
+            flinkDDL = FlinkStatementUtil.getFlinkDropDDL(sinkSchemaName, sinkTableName, isTemporary);
+            logger.info(flinkDDL);
+            customTableEnvironment.executeSql(flinkDDL);
+        }
+
         String pkList = StringUtils.join(getPKList(table), ".");
-        String flinkDDL =
-                FlinkStatementUtil.getFlinkDDL(table, tableName, config, sinkSchemaName, sinkTableName, pkList);
+        flinkDDL = FlinkStatementUtil.getFlinkDDL(table, tableName, config, sinkSchemaName, sinkTableName, pkList, isTemporary);
+
         logger.info(flinkDDL);
         customTableEnvironment.executeSql(flinkDDL);
         logger.info("Create {} FlinkSQL DDL successful...", tableName);
