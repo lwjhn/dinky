@@ -20,42 +20,50 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.dinky</groupId>
-        <artifactId>dinky</artifactId>
+        <artifactId>dinky-metadata</artifactId>
         <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    <artifactId>dinky-metadata</artifactId>
 
-    <packaging>pom</packaging>
-
-    <name>Dinky : Metadata</name>
-
-    <modules>
-        <module>dinky-metadata-base</module>
-        <module>dinky-metadata-mysql</module>
-        <module>dinky-metadata-oracle</module>
-        <module>dinky-metadata-clickhouse</module>
-        <module>dinky-metadata-postgresql</module>
-        <module>dinky-metadata-sqlserver</module>
-        <module>dinky-metadata-doris</module>
-        <module>dinky-metadata-phoenix</module>
-        <module>dinky-metadata-hive</module>
-        <module>dinky-metadata-starrocks</module>
-        <module>dinky-metadata-presto</module>
-        <module>dinky-metadata-paimon</module>
-        <module>dinky-metadata-dm</module>
-        <module>dinky-metadata-kingbase</module>
-        <module>dinky-metadata-trino</module>
-    </modules>
+    <artifactId>dinky-metadata-trino</artifactId>
+    <packaging>jar</packaging>
+    <properties>
+        <maven.compiler.source>${target.java.version}</maven.compiler.source>
+        <maven.compiler.target>${target.java.version}</maven.compiler.target>
+    </properties>
 
     <dependencies>
         <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
+            <groupId>org.dinky</groupId>
+            <artifactId>dinky-metadata-base</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.dinky</groupId>
-            <artifactId>dinky-common</artifactId>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid-spring-boot-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>1.6.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.4</version>
+        </dependency>
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+            <version>433</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 
