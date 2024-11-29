@@ -17,21 +17,24 @@
  *
  */
 
-import { Button, Result } from 'antd';
-import { l } from '@/utils/intl';
+package org.dinky.serializer;
 
-const FinishPage = () => {
-  return (
-    <Result
-      status='success'
-      title={l('welcome.finish.title')}
-      subTitle={l('welcome.finish')}
-      extra={[
-        <Button type='primary' onClick={() => (window.location.href = '/user/login')}>
-          {l('welcome.goLogin')}
-        </Button>
-      ]}
-    />
-  );
-};
-export default FinishPage;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+
+/**
+ * The timestamp deserializes the time
+ */
+public class LocalDateTimeDeserializer extends JsonDeserializer<LocalDateTime> {
+    @Override
+    public LocalDateTime deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
+            throws IOException {
+        long timestamp = jsonParser.getLongValue();
+        return LocalDateTime.ofEpochSecond(timestamp / 1000, 0, ZoneOffset.ofHours(8));
+    }
+}

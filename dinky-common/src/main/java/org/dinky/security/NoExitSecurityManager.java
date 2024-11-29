@@ -17,21 +17,24 @@
  *
  */
 
-import { Button, Result } from 'antd';
-import { l } from '@/utils/intl';
+package org.dinky.security;
 
-const FinishPage = () => {
-  return (
-    <Result
-      status='success'
-      title={l('welcome.finish.title')}
-      subTitle={l('welcome.finish')}
-      extra={[
-        <Button type='primary' onClick={() => (window.location.href = '/user/login')}>
-          {l('welcome.goLogin')}
-        </Button>
-      ]}
-    />
-  );
-};
-export default FinishPage;
+import java.security.Permission;
+
+public class NoExitSecurityManager extends SecurityManager {
+    @Override
+    public void checkPermission(Permission perm) {
+        // allow anything.
+    }
+
+    @Override
+    public void checkPermission(Permission perm, Object context) {
+        // allow anything.
+    }
+
+    @Override
+    public void checkExit(int status) {
+        super.checkExit(status);
+        throw new ExitException(status);
+    }
+}

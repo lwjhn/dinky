@@ -17,24 +17,13 @@
  *
  */
 
-package serializer;
+package org.dinky.security;
 
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+public class ExitException extends SecurityException {
+    private static final long serialVersionUID = 1L;
+    public final int status;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-
-/**
- * LocalDateTime  Serialized to a timestamp
- */
-public class LocalDateTimeSerializer extends JsonSerializer<LocalDateTime> {
-    @Override
-    public void serialize(
-            LocalDateTime localDateTime, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
-            throws IOException {
-        jsonGenerator.writeNumber(localDateTime.toInstant(ZoneOffset.ofHours(8)).toEpochMilli());
+    public ExitException(int status) {
+        this.status = status;
     }
 }

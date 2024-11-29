@@ -46,10 +46,12 @@ import { connect, useModel } from '@umijs/max';
 import CusPanelResizeHandle from '@/pages/DataStudio/components/CusPanelResizeHandle';
 import {
   ProForm,
+  ProFormCheckbox,
   ProFormInstance,
   ProFormSwitch,
   ProFormText,
-  ProFormTextArea
+  ProFormTextArea,
+  ProFormTreeSelect
 } from '@ant-design/pro-components';
 import { useAsyncEffect, useFullscreen } from 'ahooks';
 import { SelectFlinkEnv } from '@/pages/DataStudio/CenterTabContent/RunToolbar/SelectFlinkEnv';
@@ -92,6 +94,9 @@ import DiffModal from '@/pages/DataStudio/CenterTabContent/SqlTask/DiffModal';
 import TaskConfig from '@/pages/DataStudio/CenterTabContent/SqlTask/TaskConfig';
 import SelectDb from '@/pages/DataStudio/CenterTabContent/RunToolbar/SelectDb';
 import { SseData, Topic } from '@/models/UseWebSocketModel';
+import { ResourceInfo } from '@/types/RegCenter/data';
+import { buildResourceTreeDataAtTreeForm } from '@/pages/RegCenter/Resource/components/FileTree/function';
+import { ProFormDependency } from '@ant-design/pro-form';
 
 export type FlinkSqlProps = {
   showDesc: boolean;
@@ -244,6 +249,16 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
       }
     });
     observer.observe(element);
+
+    const key = Number(id.replace('project_', ''));
+    updateAction({
+      actionType: DataStudioActionType.TASK_TAB_CHANGE,
+      params: {
+        taskId: params.taskId,
+        key: key
+      }
+    });
+
     return () => {
       observer.unobserve(element);
     };
@@ -385,9 +400,13 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
   }, [currentState, updateCenterTab, props.tabData, sqlForm]);
 
   const handleCheck = useCallback(async () => {
+    const statement =
+      currentState.dialect.toLowerCase() === DIALECT.FLINKJAR
+        ? (await flinkJarFormConvertSql(sqlForm))!!
+        : currentState.statement;
     const res = await explainSql(
       l('pages.datastudio.editor.checking', '', { jobName: currentState?.name }),
-      { ...currentState }
+      { ...currentState, statement }
     );
     updateAction({
       actionType: DataStudioActionType.TASK_RUN_CHECK,
@@ -398,7 +417,14 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
     });
   }, [currentState, updateAction]);
   const handleDAG = useCallback(async () => {
-    const res = await getJobPlan(l('pages.datastudio.editor.explain.tip'), currentState);
+    const statement =
+      currentState.dialect.toLowerCase() === DIALECT.FLINKJAR
+        ? (await flinkJarFormConvertSql(sqlForm))!!
+        : currentState.statement;
+    const res = await getJobPlan(l('pages.datastudio.editor.explain.tip'), {
+      ...currentState,
+      statement
+    });
     updateAction({
       actionType: DataStudioActionType.TASK_RUN_DAG,
       params: {
@@ -867,40 +893,81 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
                     <Panel
                       className={'right-toolbar-container'}
                       style={{ overflowY: 'auto' }}
-                      defaultSize={30}
+                      defaultSize={40}
                     >
                       <Flex gap={5} vertical>
+                        {/*<Paragraph>*/}
+                        {/*  <blockquote>{l('datastudio.sqlTask.flinkJar.tip')}</blockquote>*/}
+                        {/*</Paragraph>*/}
                         <ProForm
                           submitter={false}
                           initialValues={{ ...sqlForm.jarSubmitParam }}
-                          onValuesChange={(
-                            changedValues,
-                            values: SqlConvertForm['jarSubmitParam']
-                          ) => {
+                          onValuesChange={(_, values: SqlConvertForm['jarSubmitParam']) => {
                             setSqlForm((prevState) => ({
                               ...prevState,
                               jarSubmitParam: values
                             }));
                           }}
                         >
-                          <ProFormText
-                            name={'uri'}
-                            label={'程序路径'}
-                            placeholder={'请输入运行程序路径'}
-                          />
+                          <ProFormCheckbox.Group name='manualInput' options={[l('datastudio.sqlTask.flinkJar.manualInput')]} />
+
+                          <ProFormDependency name={['manualInput']}>
+                            {({ manualInput }) => {
+                              return manualInput?.length > 0 ? (
+                                <ProFormText
+                                  name={'uri'}
+                                  label={l('datastudio.sqlTask.flinkJar.uri')}
+                                  placeholder={l('datastudio.sqlTask.flinkJar.uri.tip')}
+                                />
+                              ) : (
+                                <ProFormTreeSelect
+                                  request={async () => {
+                                    return buildResourceTreeDataAtTreeForm(
+                                      tempData.resourceDataList as ResourceInfo[],
+                                      false,
+                                      []
+                                    );
+                                  }}
+                                  normalize={(value) => {
+                                    return value?.value ?? '';
+                                  }}
+                                  name={'uri'}
+                                  label={l('datastudio.sqlTask.flinkJar.uri')}
+                                  placeholder={l('datastudio.sqlTask.flinkJar.uri.tip')}
+                                  fieldProps={{
+                                    suffixIcon: null,
+                                    filterTreeNode: true,
+                                    showSearch: true,
+                                    treeIcon: true,
+                                    popupMatchSelectWidth: false,
+                                    labelInValue: true,
+                                    autoClearSearchValue: true,
+                                    treeLine: true,
+                                    treeDefaultExpandedKeys: ['rs:/'],
+                                    treeNodeLabelProp: 'value',
+                                    fieldNames: {
+                                      label: 'title'
+                                    }
+                                  }}
+                                />
+                              );
+                            }}
+                          </ProFormDependency>
+
                           <ProFormText
                             name={'mainClass'}
-                            label={'程序运行类（mainClass）'}
-                            placeholder={'请输入运行程序运行类（mainClass）'}
+                            label={l('datastudio.sqlTask.flinkJar.mainClass')}
+                            placeholder={l('datastudio.sqlTask.flinkJar.mainClass.tip')}
                           />
                           <ProFormTextArea
                             name={'args'}
-                            label={'程序运行参数（args）'}
-                            placeholder={'程序运行参数（args）'}
+                            label={l('datastudio.sqlTask.flinkJar.args')}
+                            placeholder={l('datastudio.sqlTask.flinkJar.args.tip')}
                           />
                           <ProFormSwitch
                             name={'allowNonRestoredState'}
-                            label={'忽略未声明状态(allowNonRestoredState)'}
+                            layout='vertical'
+                            label={l('datastudio.sqlTask.flinkJar.allowNonRestoredState')}
                           />
                         </ProForm>
                       </Flex>

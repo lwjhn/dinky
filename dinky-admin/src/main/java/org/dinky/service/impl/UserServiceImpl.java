@@ -19,35 +19,42 @@
 
 package org.dinky.service.impl;
 
-import cn.dev33.satoken.secure.SaSecureUtil;
-import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.dinky.assertion.Asserts;
 import org.dinky.context.RowLevelPermissionsContext;
 import org.dinky.context.TenantContextHolder;
 import org.dinky.context.UserInfoContextHolder;
-import org.dinky.data.dto.*;
+import org.dinky.data.dto.AssignRoleDTO;
+import org.dinky.data.dto.AssignUserToTenantDTO;
+import org.dinky.data.dto.LoginDTO;
+import org.dinky.data.dto.ModifyPasswordDTO;
+import org.dinky.data.dto.UserDTO;
 import org.dinky.data.enums.Status;
 import org.dinky.data.enums.UserType;
 import org.dinky.data.exception.AuthException;
 import org.dinky.data.exception.BusException;
 import org.dinky.data.model.SysToken;
 import org.dinky.data.model.SystemConfiguration;
-import org.dinky.data.model.rbac.*;
+import org.dinky.data.model.rbac.Menu;
+import org.dinky.data.model.rbac.Role;
+import org.dinky.data.model.rbac.RoleMenu;
+import org.dinky.data.model.rbac.RowPermissions;
+import org.dinky.data.model.rbac.Tenant;
+import org.dinky.data.model.rbac.User;
+import org.dinky.data.model.rbac.UserRole;
+import org.dinky.data.model.rbac.UserTenant;
 import org.dinky.data.result.Result;
 import org.dinky.data.vo.UserVo;
 import org.dinky.mapper.TokenMapper;
 import org.dinky.mapper.UserMapper;
 import org.dinky.mybatis.service.impl.SuperServiceImpl;
-import org.dinky.service.*;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.dinky.service.MenuService;
+import org.dinky.service.RoleMenuService;
+import org.dinky.service.RoleService;
+import org.dinky.service.RowPermissionsService;
+import org.dinky.service.TenantService;
+import org.dinky.service.UserRoleService;
+import org.dinky.service.UserService;
+import org.dinky.service.UserTenantService;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -55,6 +62,20 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
+import cn.dev33.satoken.secure.SaSecureUtil;
+import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.RandomUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * UserServiceImpl
@@ -550,12 +571,17 @@ public class UserServiceImpl extends SuperServiceImpl<UserMapper, User> implemen
                 // query role menu
                 List<RoleMenu> roleMenus =
                         roleMenuService.list(new LambdaQueryWrapper<RoleMenu>().eq(RoleMenu::getRoleId, role.getId()));
-                roleMenus.forEach(roleMenu -> {
-                    Menu menu = menuService.getById(roleMenu.getMenuId());
-                    if (Asserts.isNotNull(menu) && !StrUtil.equals("M", menu.getType())) {
-                        menuList.add(menu);
-                    }
-                });
+                List<Integer> collect =
+                        roleMenus.stream().map(RoleMenu::getMenuId).collect(Collectors.toList());
+                if (CollectionUtils.isEmpty(collect)) {
+                    return;
+                }
+                List<Menu> list = menuService.list(new LambdaQueryWrapper<Menu>()
+                        .in(
+                                Menu::getId,
+                                roleMenus.stream().map(RoleMenu::getMenuId).collect(Collectors.toList()))
+                        .ne(Menu::getType, "M"));
+                menuList.addAll(list);
             }
         });
 

@@ -31,6 +31,7 @@ import org.dinky.explainer.print_table.PrintStatementExplainer;
 import org.dinky.interceptor.FlinkInterceptor;
 import org.dinky.interceptor.FlinkInterceptorResult;
 import org.dinky.job.JobStatementPlan;
+import org.dinky.resource.BaseResourceManager;
 import org.dinky.trans.Operations;
 import org.dinky.utils.KerberosUtil;
 
@@ -169,6 +170,7 @@ public abstract class Executor {
 
     protected void init(DinkyClassLoader classLoader) {
         initClassloader(classLoader);
+        initFileSystem();
         this.dinkyClassLoader = classLoader;
         Thread.currentThread().setContextClassLoader(classLoader);
         if (executorConfig.isValidParallelism()) {
@@ -193,6 +195,10 @@ public abstract class Executor {
         }
 
         isMockTest = false;
+    }
+
+    private void initFileSystem() {
+        BaseResourceManager.initResourceManager();
     }
 
     abstract CustomTableEnvironment createCustomTableEnvironment(ClassLoader classLoader);
@@ -275,7 +281,7 @@ public abstract class Executor {
     private void addJar(String... jarPath) {
         Configuration configuration = tableEnvironment.getRootConfiguration();
         List<String> jars = configuration.get(PipelineOptions.JARS);
-        if (jars == null) {
+        if (CollUtil.isEmpty(jars)) {
             tableEnvironment.addConfiguration(PipelineOptions.JARS, CollUtil.newArrayList(jarPath));
         } else {
             CollUtil.addAll(jars, jarPath);

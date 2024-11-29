@@ -31,6 +31,7 @@ import org.dinky.data.model.SystemConfiguration;
 import org.dinky.data.model.Task;
 import org.dinky.data.model.job.JobInstance;
 import org.dinky.data.model.rbac.Tenant;
+import org.dinky.function.FlinkUDFDiscover;
 import org.dinky.function.constant.PathConstant;
 import org.dinky.function.pool.UdfCodePool;
 import org.dinky.job.ClearJobHistoryTask;
@@ -93,20 +94,31 @@ public class SystemInit implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        TenantContextHolder.ignoreTenant();
-        initResources();
-        List<Tenant> tenants = tenantService.list();
-        sysConfigService.initSysConfig();
-        sysConfigService.initExpressionVariables();
+        try {
+            TenantContextHolder.ignoreTenant();
+            initResources();
+            List<Tenant> tenants = tenantService.list();
+            sysConfigService.initSysConfig();
+            sysConfigService.initExpressionVariables();
 
-        for (Tenant tenant : tenants) {
-            taskService.initDefaultFlinkSQLEnv(tenant.getId());
+            for (Tenant tenant : tenants) {
+                taskService.initDefaultFlinkSQLEnv(tenant.getId());
+            }
+            initDaemon();
+            initDolphinScheduler();
+            registerUDF();
+            discoverUDF();
+            updateGitBuildState();
+            registerURL();
+        } catch (NoClassDefFoundError e) {
+            if (e.getMessage().contains("org/apache/flink")) {
+                log.error(
+                        "No Flink Jar dependency detected, please put the Flink Jar dependency into the DInky program first. (未检测到有 Flink Jar依赖，请先放入 Flink Jar 依赖到 DInky程序里)",
+                        e);
+            } else {
+                log.error("", e);
+            }
         }
-        initDaemon();
-        initDolphinScheduler();
-        registerUDF();
-        updateGitBuildState();
-        registerURL();
     }
 
     private void registerURL() {
@@ -208,6 +220,10 @@ public class SystemInit implements ApplicationRunner {
             UdfCodePool.registerPool(allUDF.stream().map(UDFUtils::taskToUDF).collect(Collectors.toList()));
         }
         UdfCodePool.updateGitPool(gitProjectService.getGitPool());
+    }
+
+    public void discoverUDF() {
+        FlinkUDFDiscover.getCustomStaticUDFs();
     }
 
     public void updateGitBuildState() {

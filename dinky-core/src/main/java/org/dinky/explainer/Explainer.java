@@ -41,6 +41,7 @@ import org.dinky.job.JobStatementPlan;
 import org.dinky.job.builder.JobUDFBuilder;
 import org.dinky.trans.Operations;
 import org.dinky.utils.DinkyClassLoaderUtil;
+import org.dinky.utils.LogUtil;
 import org.dinky.utils.SqlUtil;
 
 import org.apache.flink.runtime.rest.messages.JobPlanInfo;
@@ -97,7 +98,20 @@ public class Explainer {
     }
 
     public JobStatementPlan parseStatements(String[] statements) {
-        JobStatementPlan jobStatementPlanWithUDFAndMock = new JobStatementPlan();
+        JobStatementPlan jobStatementPlanWithMock = new JobStatementPlan();
+        generateUDFStatement(jobStatementPlanWithMock);
+
+        JobStatementPlan jobStatementPlan = executor.parseStatementIntoJobStatementPlan(statements);
+        jobStatementPlanWithMock.getJobStatementList().addAll(jobStatementPlan.getJobStatementList());
+        if (!jobManager.isPlanMode() && jobManager.getConfig().isMockSinkFunction()) {
+            executor.setMockTest(true);
+            MockStatementExplainer.build(executor.getCustomTableEnvironment())
+                    .jobStatementPlanMock(jobStatementPlanWithMock);
+        }
+        return jobStatementPlanWithMock;
+    }
+
+    private void generateUDFStatement(JobStatementPlan jobStatementPlan) {
         List<String> udfStatements = new ArrayList<>();
         Optional.ofNullable(jobManager.getConfig().getUdfRefer())
                 .ifPresent(t -> t.forEach((key, value) -> {
@@ -105,16 +119,8 @@ public class Explainer {
                     udfStatements.add(sql);
                 }));
         for (String udfStatement : udfStatements) {
-            jobStatementPlanWithUDFAndMock.addJobStatement(udfStatement, JobStatementType.DDL, SqlType.CREATE);
+            jobStatementPlan.addJobStatement(udfStatement, JobStatementType.DDL, SqlType.CREATE);
         }
-        JobStatementPlan jobStatementPlan = executor.parseStatementIntoJobStatementPlan(statements);
-        jobStatementPlanWithUDFAndMock.getJobStatementList().addAll(jobStatementPlan.getJobStatementList());
-        if (!jobManager.isPlanMode() && jobManager.getConfig().isMockSinkFunction()) {
-            executor.setMockTest(true);
-            MockStatementExplainer.build(executor.getCustomTableEnvironment())
-                    .jobStatementPlanMock(jobStatementPlanWithUDFAndMock);
-        }
-        return jobStatementPlanWithUDFAndMock;
     }
 
     public List<UDF> parseUDFFromStatements(String[] statements) {
@@ -141,8 +147,9 @@ public class Explainer {
             jobStatementPlan.buildFinalStatement();
             jobManager.setJobStatementPlan(jobStatementPlan);
         } catch (Exception e) {
+            String error = LogUtil.getError("Exception in parsing FlinkSQL:\n" + SqlUtil.addLineNumber(statement), e);
             SqlExplainResult.Builder resultBuilder = SqlExplainResult.Builder.newBuilder();
-            resultBuilder.error(e.getMessage()).parseTrue(false);
+            resultBuilder.error(error).parseTrue(false);
             sqlExplainRecords.add(resultBuilder.build());
             log.error("Failed parseStatements:", e);
             return new ExplainResult(false, sqlExplainRecords.size(), sqlExplainRecords);
