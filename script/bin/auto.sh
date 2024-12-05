@@ -3,12 +3,20 @@
 # debug mode
 #set -x
 
-FLINK_VERSION=${2}
+# FLINK_HOME="/opt/module/flink-1.20.0/standalone"
+echo "Using FLINK_HOME: $FLINK_HOME"
+"$FLINK_HOME/bin/flink" --version
+
+FLINK_VERSION=${2:-1.20}
 
 DINKY_HOME=${DINKY_HOME:-$(cd `dirname $0`; pwd)}
 JAVA_VERSION=$(java -version 2>&1 | sed '1!d' | sed -e 's/"//g' | awk '{print $3}' | awk -F'.' '{print $1"."$2}')
 
 APP_HOME="${DINKY_HOME}"
+echo $APP_HOME
+export OPENLINEAGE_CONFIG="${DINKY_HOME}/config/openlineage.yml"
+echo "==== OPENLINEAGE_CONFIG ====> $OPENLINEAGE_CONFIG"
+
 
 DINKY_LOG_PATH="${APP_HOME}/logs"
 if [ ! -d "${DINKY_LOG_PATH}" ]; then
@@ -46,7 +54,23 @@ assertIsInputVersion() {
 }
 
 # Use FLINK_HOME:
-CLASS_PATH="${APP_HOME}:${APP_HOME}/lib/*:${APP_HOME}/config:${EXTENDS_HOME}/*:${CUSTOMER_JAR_PATH}/*:${EXTENDS_HOME}/flink${FLINK_VERSION}/dinky/*:${EXTENDS_HOME}/flink${FLINK_VERSION}/flink/*:${EXTENDS_HOME}/flink${FLINK_VERSION}/*"
+# CLASS_PATH="${APP_HOME}:${APP_HOME}/lib/*:${APP_HOME}/config:${EXTENDS_HOME}/*:${CUSTOMER_JAR_PATH}/*:${EXTENDS_HOME}/flink${FLINK_VERSION}/dinky/*:${EXTENDS_HOME}/flink${FLINK_VERSION}/flink/*:${EXTENDS_HOME}/flink${FLINK_VERSION}/*"
+CLASS_PATH="${APP_HOME}:${APP_HOME}/lib/*:${APP_HOME}/config"
+CLASS_PATH="$CLASS_PATH:$FLINK_HOME/lib/base/*:$FLINK_HOME/lib/common/*"
+# CLASS_PATH="$CLASS_PATH:${EXTENDS_HOME}/*:${CUSTOMER_JAR_PATH}/*"
+# CLASS_PATH="$CLASS_PATH:${EXTENDS_HOME}/flink${FLINK_VERSION}/dinky/*"
+# CLASS_PATH="$CLASS_PATH:${EXTENDS_HOME}/flink${FLINK_VERSION}/lib/*"
+# CLASS_PATH="$CLASS_PATH:${APP_HOME}/plugins/*"
+
+LIB_DIRS=("${CUSTOMER_JAR_PATH}" "${EXTENDS_HOME}/flink${FLINK_VERSION}" "${APP_HOME}/plugins")
+LIB_DIRS=$(find "${LIB_DIRS[@]}" -name '*.jar' -exec dirname {} \; | sort -u | awk '{printf "%s/*:", $0}' | sed 's/:$//')
+CLASS_PATH="$CLASS_PATH:$LIB_DIRS"
+echo "==== CLASS_PATH ====> $CLASS_PATH"
+
+EXTEND_VM_OPTIONS=" -Duser.timezone=UTC -Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl -Djavax.xml.parsers.DocumentBuilderFactory=com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl"
+
+
+
 PID_FILE="dinky.pid"
 
 # Log configuration file path
@@ -102,7 +126,7 @@ start() {
   assertIsInputVersion
   updatePid
   if [ -z "$pid" ]; then
-    nohup java ${PARAMS_OPT} ${JVM_OPTS} ${OOM_OPT} ${GC_OPT} -Xverify:none -cp "${CLASS_PATH}" org.dinky.Dinky ${JAR_PARAMS_OPT}  > ${DINKY_LOG_PATH}/dinky-start.log 2>&1 &
+    nohup java $EXTEND_VM_OPTIONS ${PARAMS_OPT} ${JVM_OPTS} ${OOM_OPT} ${GC_OPT} -Xverify:none -cp "${CLASS_PATH}" org.dinky.Dinky ${JAR_PARAMS_OPT}  > ${DINKY_LOG_PATH}/dinky-start.log 2>&1 &
     echo $! >"${PID_PATH}"/${PID_FILE}
     echo "........................................Start Dinky Done........................................"
     echo "current log path : ${DINKY_LOG_PATH}/dinky-start.log , you can execute tail -fn1000 ${DINKY_LOG_PATH}/dinky-start.log to watch the log"
@@ -115,7 +139,7 @@ startOnPending() {
   assertIsInputVersion
   updatePid
   if [ -z "$pid" ]; then
-    java ${PARAMS_OPT} ${JVM_OPTS} ${OOM_OPT} ${GC_OPT} -Xverify:none -cp "${CLASS_PATH}" org.dinky.Dinky  ${JAR_PARAMS_OPT}
+    java $EXTEND_VM_OPTIONS ${PARAMS_OPT} ${JVM_OPTS} ${OOM_OPT} ${GC_OPT} -Xverify:none -cp "${CLASS_PATH}" org.dinky.Dinky  ${JAR_PARAMS_OPT}
     echo "........................................Start Dinky Successfully........................................"
   else
     echo "Dinky pid $pid is in ${PID_PATH}/${PID_FILE}, Please stop first !!!"
@@ -126,7 +150,7 @@ startWithJmx() {
   assertIsInputVersion
   updatePid
   if [ -z "$pid" ]; then
-    nohup java ${PARAMS_OPT} ${JVM_OPTS} ${OOM_OPT} ${GC_OPT} -Xverify:none "${JMX}" -cp "${CLASS_PATH}" org.dinky.Dinky  ${JAR_PARAMS_OPT}  > ${DINKY_LOG_PATH}/dinky-start.log 2>&1 &
+    nohup java $EXTEND_VM_OPTIONS ${PARAMS_OPT} ${JVM_OPTS} ${OOM_OPT} ${GC_OPT} -Xverify:none "${JMX}" -cp "${CLASS_PATH}" org.dinky.Dinky  ${JAR_PARAMS_OPT}  > ${DINKY_LOG_PATH}/dinky-start.log 2>&1 &
 #    echo $! >"${PID_PATH}"/${PID_FILE}
     updatePid
     echo "........................................Start Dinky with Jmx Successfully.....................................
