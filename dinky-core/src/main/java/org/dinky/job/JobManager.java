@@ -52,26 +52,18 @@ import org.dinky.gateway.enums.SavePointType;
 import org.dinky.gateway.result.GatewayResult;
 import org.dinky.gateway.result.SavePointResult;
 import org.dinky.gateway.result.TestResult;
-import org.dinky.job.builder.JobJarStreamGraphBuilder;
-import org.dinky.job.runner.JobJarRunner;
 import org.dinky.trans.Operations;
 import org.dinky.trans.parse.AddFileSqlParseStrategy;
 import org.dinky.trans.parse.AddJarSqlParseStrategy;
 import org.dinky.utils.DinkyClassLoaderUtil;
-import org.dinky.utils.FlinkStreamEnvironmentUtil;
-import org.dinky.utils.JsonUtils;
 import org.dinky.utils.LogUtil;
 import org.dinky.utils.SqlUtil;
 import org.dinky.utils.URLUtils;
 
-import org.apache.flink.api.dag.Pipeline;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.CoreOptions;
 import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.configuration.PipelineOptions;
-import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
-import org.apache.flink.runtime.jobgraph.jsonplan.JsonPlanGenerator;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.yarn.configuration.YarnConfigOptions;
@@ -248,13 +240,6 @@ public class JobManager {
         return true;
     }
 
-    public ObjectNode getJarStreamGraphJson(String statement) {
-        Pipeline pipeline = JobJarStreamGraphBuilder.build(this).getJarStreamGraph(statement, getDinkyClassLoader());
-        Configuration configuration = Configuration.fromMap(getExecutorConfig().getConfig());
-        JobGraph jobGraph = FlinkStreamEnvironmentUtil.getJobGraph(pipeline, configuration);
-        return JsonUtils.parseObject(JsonPlanGenerator.generatePlan(jobGraph));
-    }
-
     @ProcessStep(type = ProcessStepType.SUBMIT_EXECUTE)
     public JobResult executeJarSql(String statement) throws Exception {
         List<String> statements = Arrays.stream(SqlUtil.getStatements(statement))
@@ -266,12 +251,10 @@ public class JobManager {
         jobStatementPlan.buildFinalStatement();
         job = Job.build(runMode, config, executorConfig, executor, statement, useGateway);
         ready();
+        JobRunnerFactory jobRunnerFactory = JobRunnerFactory.create(this);
         try {
-            // Only one is executed.
             for (JobStatement jobStatement : jobStatementPlan.getJobStatementList()) {
-                JobJarRunner jobJarRunner = new JobJarRunner(this);
-                jobJarRunner.run(jobStatement);
-                break;
+                jobRunnerFactory.getJobRunner(jobStatement.getStatementType()).run(jobStatement);
             }
             if (job.isFailed()) {
                 failed();
